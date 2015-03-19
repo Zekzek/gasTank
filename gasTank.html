@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html ng-app="gasTankApp">
+  <head>
+    <meta charset="UTF-8">
+    <title>Gas Tank</title>
+    <!-- <link rel="stylesheet" href="gasTank.css"> -->
+    <script type="text/javascript" src="../angular.js"></script>
+    <script type="text/javascript" src="gasTank.js"></script>
+  </head>
+  <body ng-controller="gasTankCtrl">
+    <svg
+      ng-attr-width="{{(columnLabels.length + 1) * squareSize + 2 * borderSize}}" 
+      ng-attr-height="{{(rowLabels.length + 1) * squareSize + 2 * borderSize}}">
+      
+      <!-- BOARD SQUARES -->
+      <g ng-repeat="row in rowLabels">
+        <rect ng-repeat="column in columnLabels"
+          ng-attr-x="{{borderSize + ($index + 1) * squareSize}}"
+          ng-attr-y="{{borderSize + $parent.$index * squareSize}}"
+          ng-attr-width="{{squareSize}}"
+          ng-attr-height="{{squareSize}}"
+          style="fill:#AAA;stroke-width:2;stroke:#000" 
+        />
+      </g>      
+      <rect ng-repeat="move in validMoves"
+        ng-attr-x="{{borderSize + (move.x + 1) * squareSize}}"
+        ng-attr-y="{{borderSize + move.y * squareSize}}"
+        ng-attr-width="{{squareSize}}"
+        ng-attr-height="{{squareSize}}"
+        style="fill:#CC9;stroke-width:2;stroke:#FF0" 
+      />
+      
+      <!-- PIECES -->
+      <text ng-repeat="piece in humanPieces"
+        text-anchor="middle"
+        ng-attr-font-size="{{squareSize}}px"
+        ng-attr-x="{{(piece.x + 1.5) * squareSize + borderSize}}"
+        ng-attr-y="{{(piece.y + 0.8) * squareSize + borderSize}}"
+        fill="#00A"
+        stroke="#FFF"
+        ng-click="displayValidMovesFor(piece)"
+      >{{piece.symbol}}</text>
+      <text ng-repeat="piece in computerPieces"
+        text-anchor="middle"
+        ng-attr-font-size="{{squareSize}}px"
+        ng-attr-x="{{(piece.x + 1.5) * squareSize + borderSize}}"
+        ng-attr-y="{{(piece.y + 0.8) * squareSize + borderSize}}"
+        fill="#A00"
+        stroke="#000"
+        ng-click="displayValidMovesFor(piece)"
+      >{{piece.symbol}}</text>
+      
+      <!-- BORDER -->
+      <rect 
+        ng-attr-x="{{squareSize}}" 
+        ng-attr-width="{{2 * borderSize + columnLabels.length * squareSize}}" 
+        ng-attr-height="{{borderSize}}" 
+        style="fill:rgb(20,20,20)" 
+      />
+      <rect 
+        ng-attr-x="{{squareSize}}" 
+        ng-attr-y="{{borderSize + rowLabels.length * squareSize}}"
+        ng-attr-width="{{2 * borderSize + columnLabels.length * squareSize}}" 
+        ng-attr-height="{{borderSize}}" 
+        style="fill:rgb(20,20,20)" 
+      />
+      <rect
+        ng-attr-x="{{squareSize}}"
+        ng-attr-width="{{borderSize}}" 
+        ng-attr-height="{{2 * borderSize + rowLabels.length * squareSize}}" 
+        style="fill:rgb(20,20,20)"
+      />
+      <rect 
+        ng-attr-x="{{borderSize + (columnLabels.length + 1) * squareSize}}" 
+        ng-attr-width="{{borderSize}}"
+        ng-attr-height="{{2 * borderSize + rowLabels.length * squareSize}}" 
+        style="fill:rgb(20,20,20)" 
+      />
+      
+      <!-- LABELS -->
+      <text ng-repeat="column in columnLabels"
+        text-anchor="middle"
+        ng-attr-font-size="{{squareSize}}px"
+        ng-attr-x="{{($index + 1.5) * squareSize + borderSize}}"
+        ng-attr-y="{{(columnLabels.length - 0.2) * squareSize + 2 * borderSize}}"
+      >
+        {{column}}
+      </text>
+      <text ng-repeat="row in rowLabels"
+        text-anchor="middle"
+        ng-attr-font-size="{{squareSize}}px"
+        ng-attr-x="{{0.5 * squareSize}}"
+        ng-attr-y="{{($index + 0.8) * squareSize + borderSize}}"
+      >
+        {{row}}
+      </text>
+    </svg>
+  </body>
+</html>
