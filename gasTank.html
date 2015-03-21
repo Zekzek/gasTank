@@ -3,97 +3,325 @@
   <head>
     <meta charset="UTF-8">
     <title>Gas Tank</title>
-    <!-- <link rel="stylesheet" href="gasTank.css"> -->
-    <script type="text/javascript" src="../angular.js"></script>
+    <link rel="stylesheet" href="gasTank.css">
+    <script type="text/javascript" src="angular.js"></script>
     <script type="text/javascript" src="gasTank.js"></script>
+    <script type="text/javascript" src="negamaxWorker.js"></script>
   </head>
   <body ng-controller="gasTankCtrl">
-    <svg
-      ng-attr-width="{{(columnLabels.length + 1) * squareSize + 2 * borderSize}}" 
-      ng-attr-height="{{(rowLabels.length + 1) * squareSize + 2 * borderSize}}">
-      
-      <!-- BOARD SQUARES -->
-      <g ng-repeat="row in rowLabels">
-        <rect ng-repeat="column in columnLabels"
-          ng-attr-x="{{borderSize + ($index + 1) * squareSize}}"
-          ng-attr-y="{{borderSize + $parent.$index * squareSize}}"
+    <div class="inline top" style="width:25%">
+      <div class="center"><h2>{{player[TOP].name}}</h2></div>
+      <!-- TOP SETUP -->
+      <div ng-if="phase == 'setup'">
+        <div class="center">Who are you?: <input type="text" ng-model="player[TOP].name"></div>
+        <div class="center">What are you?: <select ng-options="ai for ai in aiSettings" ng-model="player[TOP].ai"></select></div>
+        <div class="center">What color are you?: <input type="color" ng-model="player[TOP].color"/></div>
+        <div class="center" ng-if="player[TOP].ai=='Computer'">How long are you going to think?: <input type="text" size="3" ng-model="player[TOP].time"> seconds</div>
+        <div class="center"> When are you moving?
+          <select 
+            ng-options="order for order in orderOptions" 
+            ng-model="player[TOP].order"
+            ng-change="toggleOrder(player[BOTTOM])">
+          </select>
+        </div>
+      </div>
+      <hr />
+      <div ng-if="phase == 'game' && turn == TOP">
+        <!-- TOP COMPUTER -->
+        <div ng-if="player[TOP].ai=='Computer'">
+          <div class="center">
+            <input type="button" value="Start Thinking" ng-disabled="thinking" ng-click="getBestMove(1, turn, player[TOP].time)">
+            <input type="button" value="Stop Thinking" ng-disabled="!thinking" ng-click="killWorkers()">
+          </div>
+          <div class="center">
+            Move: 
+            {{columnLabels[bestMove[0].x]}}{{rowLabels[bestMove[0].y]}}{{columnLabels[bestMove[1].x]}}{{rowLabels[bestMove[1].y]}} ({{bestMove.score}})  
+            <input type="button" value="Make Move" ng-disabled="!bestMove" ng-click="makeMove(playBoard, bestMove); clearBestMove();">
+          </div> 
+          <div class="center" ng-repeat="move in moveList | orderBy : 'score':true">
+            {{columnLabels[move[0].x]}}{{rowLabels[move[0].y]}}{{columnLabels[move[1].x]}}{{rowLabels[move[1].y]}} ({{move.score}}) |
+            <span ng-repeat="bestMoves in move.moves">
+              {{columnLabels[bestMoves[0].x]}}{{rowLabels[bestMoves[0].y]}}{{columnLabels[bestMoves[1].x]}}{{rowLabels[bestMoves[1].y]}} 
+            </span>
+          </div>
+        </div>
+        <!-- TOP HUMAN -->
+        <div ng-if="player[TOP].ai=='Human'" class="center">
+          <div class="center">
+            <span>{{columnLabels[humanMove[0].x]}}{{rowLabels[humanMove[0].y]}}</span>
+            <span>{{columnLabels[humanMove[1].x]}}{{rowLabels[humanMove[1].y]}}</span>
+          </div>
+          <div class="center">
+            <span ng-if="validMove === true">VALID MOVE</span>
+            <span ng-if="validMove === false">INVALID MOVE</span>
+          </div>
+          <input type="button" value="Make Move" ng-disabled="!validMove" ng-click="makeMove(playBoard, humanMove); clearValidMoves()">
+        </div>
+      </div>
+    </div>
+    <!-- GAME BOARD -->
+    <div class="inline" style="width:48%">
+      <svg class="inline noselect"
+        style="width:100%"
+        viewBox="0 0 {{(columnLabels.length + 1) * squareSize + 2 * borderSize}} {{(rowLabels.length + 1) * squareSize + 2 * borderSize}}"
+        preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <filter id="dropShadow" x="-50%" y="-25%" width="200%" height="150%">
+            <feOffset result="offOut" in="SourceAlpha" />
+            <feGaussianBlur result="blurOut" in="offOut" stdDeviation="50" />
+            <feBlend in="SourceGraphic" in2="blurOut" mode="normal" />
+          </filter>
+          <radialGradient id="greenGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+            <stop offset="0%" style="stop-color:#0F0;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#090;stop-opacity:1" />
+          </radialGradient>
+          <linearGradient id="greenGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#090;stop-opacity:1" />
+            <stop offset="50%" style="stop-color:#0F0;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#090;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        <!-- BOARD SQUARES -->
+        <g ng-repeat="row in rowLabels">
+          <rect ng-repeat="column in columnLabels"
+            ng-attr-x="{{borderSize + ($index + 1) * squareSize}}"
+            ng-attr-y="{{borderSize + $parent.$index * squareSize}}"
+            ng-attr-width="{{squareSize}}"
+            ng-attr-height="{{squareSize}}"
+            ng-mousedown="setStartPos({x:$index, y:$parent.$index})"
+            ng-mouseup="setEndPos({x:$index, y:$parent.$index})"
+            style="
+              fill:#AAA;
+              stroke-width:2;
+              stroke:#000" 
+          />
+        </g>
+        <!-- VALID MOVES -->
+        <rect ng-repeat="move in validMoves"
+          ng-attr-x="{{borderSize + (move.x + 1) * squareSize}}"
+          ng-attr-y="{{borderSize + move.y * squareSize}}"
           ng-attr-width="{{squareSize}}"
           ng-attr-height="{{squareSize}}"
-          style="fill:#AAA;stroke-width:2;stroke:#000" 
+          style="
+            fill:#CC9;
+            stroke-width:2;
+            stroke:#FF0;
+            pointer-events:none;" 
         />
-      </g>      
-      <rect ng-repeat="move in validMoves"
-        ng-attr-x="{{borderSize + (move.x + 1) * squareSize}}"
-        ng-attr-y="{{borderSize + move.y * squareSize}}"
-        ng-attr-width="{{squareSize}}"
-        ng-attr-height="{{squareSize}}"
-        style="fill:#CC9;stroke-width:2;stroke:#FF0" 
-      />
-      
-      <!-- PIECES -->
-      <text ng-repeat="piece in humanPieces"
-        text-anchor="middle"
-        ng-attr-font-size="{{squareSize}}px"
-        ng-attr-x="{{(piece.x + 1.5) * squareSize + borderSize}}"
-        ng-attr-y="{{(piece.y + 0.8) * squareSize + borderSize}}"
-        fill="#00A"
-        stroke="#FFF"
-        ng-click="displayValidMovesFor(piece)"
-      >{{piece.symbol}}</text>
-      <text ng-repeat="piece in computerPieces"
-        text-anchor="middle"
-        ng-attr-font-size="{{squareSize}}px"
-        ng-attr-x="{{(piece.x + 1.5) * squareSize + borderSize}}"
-        ng-attr-y="{{(piece.y + 0.8) * squareSize + borderSize}}"
-        fill="#A00"
-        stroke="#000"
-        ng-click="displayValidMovesFor(piece)"
-      >{{piece.symbol}}</text>
-      
-      <!-- BORDER -->
-      <rect 
-        ng-attr-x="{{squareSize}}" 
-        ng-attr-width="{{2 * borderSize + columnLabels.length * squareSize}}" 
-        ng-attr-height="{{borderSize}}" 
-        style="fill:rgb(20,20,20)" 
-      />
-      <rect 
-        ng-attr-x="{{squareSize}}" 
-        ng-attr-y="{{borderSize + rowLabels.length * squareSize}}"
-        ng-attr-width="{{2 * borderSize + columnLabels.length * squareSize}}" 
-        ng-attr-height="{{borderSize}}" 
-        style="fill:rgb(20,20,20)" 
-      />
-      <rect
-        ng-attr-x="{{squareSize}}"
-        ng-attr-width="{{borderSize}}" 
-        ng-attr-height="{{2 * borderSize + rowLabels.length * squareSize}}" 
-        style="fill:rgb(20,20,20)"
-      />
-      <rect 
-        ng-attr-x="{{borderSize + (columnLabels.length + 1) * squareSize}}" 
-        ng-attr-width="{{borderSize}}"
-        ng-attr-height="{{2 * borderSize + rowLabels.length * squareSize}}" 
-        style="fill:rgb(20,20,20)" 
-      />
-      
-      <!-- LABELS -->
-      <text ng-repeat="column in columnLabels"
-        text-anchor="middle"
-        ng-attr-font-size="{{squareSize}}px"
-        ng-attr-x="{{($index + 1.5) * squareSize + borderSize}}"
-        ng-attr-y="{{(columnLabels.length - 0.2) * squareSize + 2 * borderSize}}"
-      >
-        {{column}}
-      </text>
-      <text ng-repeat="row in rowLabels"
-        text-anchor="middle"
-        ng-attr-font-size="{{squareSize}}px"
-        ng-attr-x="{{0.5 * squareSize}}"
-        ng-attr-y="{{($index + 0.8) * squareSize + borderSize}}"
-      >
-        {{row}}
-      </text>
-    </svg>
+        <!-- TOP PIECES -->
+        <text ng-repeat="piece in playBoard.pieces[TOP]"
+          text-anchor="middle"
+          ng-attr-font-size="{{squareSize}}px"
+          ng-attr-x="{{(piece.x + 1.4) * squareSize + borderSize}}"
+          ng-attr-y="{{(piece.y + 0.8) * squareSize + borderSize}}"
+          ng-attr-fill="{{player[TOP].color}}"
+          stroke="#000"
+          style="pointer-events:none;"
+        >{{piece.symbol}}</text>
+        <rect ng-repeat="piece in playBoard.pieces[TOP]"
+          ng-attr-x="{{(piece.x + 1.74) * squareSize + borderSize}}"
+          ng-attr-y="{{(piece.y + 0.95 - 0.8 * (piece.gas / 3 + 0.1)) * squareSize + borderSize}}"     
+          ng-attr-rx="{{squareSize/10}}"
+          ng-attr-ry="{{squareSize/10}}"
+          ng-attr-width="{{0.2 * squareSize}}"
+          ng-attr-height="{{squareSize * 0.8 *(piece.gas / 3 + 0.1)}}" 
+          stroke="#000"
+          ng-attr-fill="{{gasColor[piece.gas]}}"
+          style="pointer-events:none;"
+        />
+        <text ng-repeat="piece in playBoard.pieces[TOP]"
+          text-anchor="middle"
+          ng-attr-font-size="{{squareSize / 2}}px"
+          ng-attr-x="{{(piece.x + 1.85) * squareSize + borderSize}}"
+          ng-attr-y="{{(piece.y + 0.9) * squareSize + borderSize}}"
+          ng-attr-fill="{{player[TOP].color}}"
+          stroke="#000"
+          style="pointer-events:none;"
+        >{{piece.gas}}</text>
+        <!-- BOTTOM PIECES -->
+        <text ng-repeat="piece in playBoard.pieces[BOTTOM]"
+          text-anchor="middle"
+          ng-attr-font-size="{{squareSize}}px"
+          ng-attr-x="{{(piece.x + 1.4) * squareSize + borderSize}}"
+          ng-attr-y="{{(piece.y + 0.8) * squareSize + borderSize}}"
+          ng-attr-fill="{{player[BOTTOM].color}}"
+          stroke="#FFF"
+          style="pointer-events:none;"
+        >{{piece.symbol}}</text>
+        <rect ng-repeat="piece in playBoard.pieces[BOTTOM]"
+          ng-attr-x="{{(piece.x + 1.74) * squareSize + borderSize}}"
+          ng-attr-y="{{(piece.y + 0.95 - 0.8 * (piece.gas / 3 + 0.1)) * squareSize + borderSize}}"     
+          ng-attr-rx="{{squareSize/10}}"
+          ng-attr-ry="{{squareSize/10}}"
+          ng-attr-width="{{0.2 * squareSize}}"
+          ng-attr-height="{{squareSize * 0.8 *(piece.gas / 3 + 0.1)}}" 
+          stroke="#FFF"
+          ng-attr-fill="{{gasColor[piece.gas]}}"
+          style="pointer-events:none;"
+        />
+        <text ng-repeat="piece in playBoard.pieces[BOTTOM]"
+          text-anchor="middle"
+          ng-attr-font-size="{{squareSize / 2}}px"
+          ng-attr-x="{{(piece.x + 1.85) * squareSize + borderSize}}"
+          ng-attr-y="{{(piece.y + 0.9) * squareSize + borderSize}}"
+          ng-attr-fill="{{player[BOTTOM].color}}"
+          stroke="#FFF"
+          style="pointer-events:none;"
+        >{{piece.gas}}</text>
+        <!-- BORDER -->
+        <rect 
+          ng-attr-x="{{squareSize}}" 
+          ng-attr-width="{{2 * borderSize + columnLabels.length * squareSize}}" 
+          ng-attr-height="{{borderSize}}" 
+          style="fill:rgb(20,20,20)" 
+        />
+        <rect 
+          ng-attr-x="{{squareSize}}" 
+          ng-attr-y="{{borderSize + rowLabels.length * squareSize}}"
+          ng-attr-width="{{2 * borderSize + columnLabels.length * squareSize}}" 
+          ng-attr-height="{{borderSize}}" 
+          style="fill:rgb(20,20,20)" 
+        />
+        <rect
+          ng-attr-x="{{squareSize}}"
+          ng-attr-width="{{borderSize}}" 
+          ng-attr-height="{{2 * borderSize + rowLabels.length * squareSize}}" 
+          style="fill:rgb(20,20,20)"
+        />
+        <rect 
+          ng-attr-x="{{borderSize + (columnLabels.length + 1) * squareSize}}" 
+          ng-attr-width="{{borderSize}}"
+          ng-attr-height="{{2 * borderSize + rowLabels.length * squareSize}}" 
+          style="fill:rgb(20,20,20)" 
+        />
+        <!-- LABELS -->
+        <text ng-repeat="column in columnLabels"
+          text-anchor="middle"
+          ng-attr-font-size="{{squareSize}}px"
+          ng-attr-x="{{($index + 1.5) * squareSize + borderSize}}"
+          ng-attr-y="{{(columnLabels.length - 0.2) * squareSize + 2 * borderSize}}"
+        >
+          {{column}}
+        </text>
+        <text ng-repeat="row in rowLabels"
+          text-anchor="middle"
+          ng-attr-font-size="{{squareSize}}px"
+          ng-attr-x="{{0.5 * squareSize}}"
+          ng-attr-y="{{($index + 0.8) * squareSize + borderSize}}"
+        >
+          {{row}}
+        </text>
+        <!-- START BUTTON -->
+        <rect ng-if="phase == 'setup'"
+          ng-attr-x="{{squareSize / 2 + borderSize + (columnLabels.length-3) * squareSize / 2}}"
+          ng-attr-y="{{borderSize + (rowLabels.length+1) * squareSize / 2 - squareSize * 0.8}}"
+          ng-attr-width="{{squareSize * 4}}"
+          ng-attr-height="{{squareSize}}"
+          ng-attr-rx="{{squareSize/3}}"
+          ng-attr-ry="{{squareSize/3}}"
+          fill="url(#greenGradient)"
+          stroke="#000"
+          stroke-width="8"
+          filter="url(#dropShadow)"
+          style="cursor:pointer"
+          ng-click="startGame()"
+        />
+        <text ng-if="phase == 'setup'"
+          text-anchor="middle"
+          ng-attr-font-size="{{squareSize}}px"
+          ng-attr-x="{{squareSize / 2 + borderSize + (columnLabels.length+1) * squareSize / 2}}"
+          ng-attr-y="{{borderSize + (rowLabels.length+1) * squareSize / 2}}"
+          style="cursor:pointer"
+          ng-click="startGame()"
+        >
+          FIGHT!
+        </text>
+        <!-- WIN MESSAGE -->
+        <rect ng-if="phase == 'win'"
+          ng-attr-x="{{squareSize + borderSize + (columnLabels.length - (2.5 + winner.name.length/4)) * squareSize / 2 }}"
+          ng-attr-y="{{borderSize + (rowLabels.length+1) * squareSize / 2 - squareSize * 0.8}}"
+          ng-attr-width="{{squareSize * (2.5 + winner.name.length/4)}}"
+          ng-attr-height="{{squareSize}}"
+          ng-attr-rx="{{squareSize/3}}"
+          ng-attr-ry="{{squareSize/3}}"
+          fill="url(#greenGradient)"
+          stroke="#000"
+          stroke-width="8"
+          filter="url(#dropShadow)"
+          style="cursor:pointer"
+          ng-click="reset()"
+        />
+        <text ng-if="phase == 'win'"
+          text-anchor="middle"
+          ng-attr-font-size="{{squareSize/2}}px"
+          ng-attr-x="{{squareSize + borderSize + columnLabels.length * squareSize / 2}}"
+          ng-attr-y="{{borderSize + (rowLabels.length + 0.4) * squareSize / 2}}"
+          style="cursor:pointer"
+          ng-click="reset()"
+        >
+          {{winner.name}} WINS!
+        </text>
+        <text ng-if="phase == 'win'"
+          text-anchor="middle"
+          ng-attr-font-size="{{squareSize/5}}px"
+          ng-attr-x="{{squareSize / 2 + borderSize + (columnLabels.length+1) * squareSize / 2}}"
+          ng-attr-y="{{borderSize + (rowLabels.length+1) * squareSize / 2}}"
+          style="cursor:pointer"
+          ng-click="reset()"
+        >
+          (Click to restart)
+        </text>
+      </svg>
+    </div>
+    <div class="inline middle" style="width:25%">
+      <div ng-if="phase == 'game' && turn == BOTTOM">
+        <!-- BOTTOM COMPUTER -->
+        <div ng-if="player[BOTTOM].ai=='Computer'">
+          <div class="center">
+            <input type="button" value="Start Thinking" ng-disabled="thinking" ng-click="getBestMove(1, turn, player[BOTTOM].time)">
+            <input type="button" value="Stop Thinking" ng-disabled="!thinking" ng-click="killWorkers()">
+          </div>
+          <div class="center">
+            Move: 
+            {{columnLabels[bestMove[0].x]}}{{rowLabels[bestMove[0].y]}}{{columnLabels[bestMove[1].x]}}{{rowLabels[bestMove[1].y]}} ({{bestMove.score}})  
+            <input type="button" value="Make Move" ng-disabled="!bestMove" ng-click="makeMove(playBoard, bestMove); clearBestMove();">
+          </div> 
+          <div class="center" ng-repeat="move in moveList | orderBy : 'score':true">
+            {{columnLabels[move[0].x]}}{{rowLabels[move[0].y]}}{{columnLabels[move[1].x]}}{{rowLabels[move[1].y]}} ({{move.score}}) |
+            <span ng-repeat="bestMoves in move.moves">
+              {{columnLabels[bestMoves[0].x]}}{{rowLabels[bestMoves[0].y]}}{{columnLabels[bestMoves[1].x]}}{{rowLabels[bestMoves[1].y]}} 
+            </span>
+          </div>
+        </div>
+        <!-- BOTTOM HUMAN -->
+        <div ng-if="player[BOTTOM].ai=='Human'" class="center">
+          <div class="center">
+            <span>{{columnLabels[humanMove[0].x]}}{{rowLabels[humanMove[0].y]}}</span>
+            <span>{{columnLabels[humanMove[1].x]}}{{rowLabels[humanMove[1].y]}}</span>
+          </div>
+          <div class="center">
+            <span ng-if="validMove === true">VALID MOVE</span>
+            <span ng-if="validMove === false">INVALID MOVE</span>
+          </div>
+          <input type="button" value="Make Move" ng-disabled="!validMove" ng-click="makeMove(playBoard, humanMove); clearValidMoves()">
+        </div>
+      </div>
+      <hr />
+      <div class="center"><h2>{{player[BOTTOM].name}}</h2></div>
+      <!-- BOTTOM SETUP -->
+      <div ng-if="phase == 'setup'">
+        <div class="center">Who are you?: <input type="text" ng-model="player[BOTTOM].name"></div>
+        <div class="center">What are you?: <select ng-options="ai for ai in aiSettings" ng-model="player[BOTTOM].ai"></select></div>
+        <div class="center">What color are you?: <input type="color" ng-model="player[BOTTOM].color"/></div>
+        <div class="center" ng-if="player[BOTTOM].ai=='Computer'">How long are you going to think?: <input type="text" size="3" ng-model="player[BOTTOM].time"> seconds</div>
+        <div class="center"> When are you moving?
+          <select 
+            ng-options="order for order in orderOptions" 
+            ng-model="player[BOTTOM].order"
+            ng-change="toggleOrder(player[TOP])">
+          </select>
+        </div>
+      </div>
+    </div>
   </body>
 </html>
