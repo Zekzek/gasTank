@@ -100,6 +100,7 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 	}
 	
 	$scope.getBestMove = function(depth, isPlayer, time) {
+		console.debug('getBestMove(' + depth + "," + isPlayer + "," + time + ")");
 		$scope.thinking = true;
 		if (time) {
 			setTimeout(function() {
@@ -109,9 +110,9 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 		}
 		var childBoards = getChildBoards($scope.playBoard, isPlayer);
 		$scope.moveCount = childBoards.length;
-		console.debug("childBoards.length: " + childBoards.length);
 		$scope.movesRecieved = 0;
 		$scope.bestValue = Number.NEGATIVE_INFINITY;
+		$scope.depth = depth;
 		var bestMove = null;
 		$scope.workers = [];
 		for (var i in childBoards) {		
@@ -124,14 +125,16 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 			negamaxWorker.onmessage = function(msg) {
 				console.debug("getBestMove received: " + JSON.stringify(msg.data));
 				$scope.movesRecieved++;
-				$scope.moveList[msg.data.index].score = msg.data.value;
-				$scope.moveList[msg.data.index].moves = msg.data.moves;
+				//$scope.moveList[msg.data.index].score = msg.data.value;
+				//$scope.moveList[msg.data.index].moves = msg.data.moves;
 				if (msg.data.value > $scope.bestValue) {
 					$scope.bestValue = msg.data.value;
-					$scope.bestMove = childBoards[msg.data.index].move;
+					bestMove = childBoards[msg.data.index].move;
+					bestMove.score = msg.data.value;
 				}
-				$scope.$apply();
 				if ($scope.movesRecieved == $scope.moveCount) {
+					$scope.bestMove = bestMove;
+					$scope.$apply();
 					if (depth < 30) {
 						$scope.getBestMove(depth + 1, isPlayer);
 					}
@@ -152,30 +155,20 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 		$scope.thinking = false;
 	}
 	
-	$scope.makeMove = function(board, move) {
+	$scope.makeMove = function(move) {
 		if (!move[0].symbol) {
-			move[0] = getAtPos(board, move[0]);
+			move[0] = getAtPos($scope.playBoard, move[0]);
 		}
-		makeMove(board, move[0], move[1]);
+		makeMove($scope.playBoard, move[0], move[1]);
 		$scope.turn *= -1;
-		$scope.checkForWin();
+		$scope.checkForLoss();
 		$scope.humanMove[0] = null;
 		$scope.humanMove[1] = null;
 		$scope.clearBestMove();
 	}
 	
-	$scope.checkForWin = function() {
-		var hasKing = false;
-		var hasMoves = false;
-		for (var i in $scope.playBoard.pieces[$scope.turn]) {
-			if ($scope.playBoard.pieces[$scope.turn][i].symbol == 'K') {
-				hasKing = true;
-			}
-			if (!hasMoves && getValidMovesFor($scope.playBoard, $scope.playBoard.pieces[$scope.turn][i]).length > 0) {
-				hasMoves = true;
-			}
-		}
-		if (!hasKing || !hasMoves) {
+	$scope.checkForLoss = function() {
+		if (checkForLoss($scope.playBoard, $scope.turn)) {
 			$scope.phase = 'win';
 			$scope.winner = $scope.player[-$scope.turn];
 		}

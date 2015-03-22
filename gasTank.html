@@ -34,16 +34,10 @@
             <input type="button" value="Stop Thinking" ng-disabled="!thinking" ng-click="killWorkers()">
           </div>
           <div class="center">
-            Move: 
+            Move ({{depth}}): 
             {{columnLabels[bestMove[0].x]}}{{rowLabels[bestMove[0].y]}}{{columnLabels[bestMove[1].x]}}{{rowLabels[bestMove[1].y]}} ({{bestMove.score}})  
-            <input type="button" value="Make Move" ng-disabled="!bestMove" ng-click="makeMove(playBoard, bestMove); clearBestMove();">
+            <input type="button" value="Make Move" ng-disabled="!bestMove" ng-click="makeMove(bestMove); clearBestMove();">
           </div> 
-          <div class="center" ng-repeat="move in moveList | orderBy : 'score':true">
-            {{columnLabels[move[0].x]}}{{rowLabels[move[0].y]}}{{columnLabels[move[1].x]}}{{rowLabels[move[1].y]}} ({{move.score}}) |
-            <span ng-repeat="bestMoves in move.moves">
-              {{columnLabels[bestMoves[0].x]}}{{rowLabels[bestMoves[0].y]}}{{columnLabels[bestMoves[1].x]}}{{rowLabels[bestMoves[1].y]}} 
-            </span>
-          </div>
         </div>
         <!-- TOP HUMAN -->
         <div ng-if="player[TOP].ai=='Human'" class="center">
@@ -55,7 +49,7 @@
             <span ng-if="validMove === true">VALID MOVE</span>
             <span ng-if="validMove === false">INVALID MOVE</span>
           </div>
-          <input type="button" value="Make Move" ng-disabled="!validMove" ng-click="makeMove(playBoard, humanMove); clearValidMoves()">
+          <input type="button" value="Make Move" ng-disabled="!validMove" ng-click="makeMove(humanMove); clearValidMoves()">
         </div>
       </div>
     </div>
@@ -282,15 +276,9 @@
             <input type="button" value="Stop Thinking" ng-disabled="!thinking" ng-click="killWorkers()">
           </div>
           <div class="center">
-            Move: 
+            Move ({{depth}}): 
             {{columnLabels[bestMove[0].x]}}{{rowLabels[bestMove[0].y]}}{{columnLabels[bestMove[1].x]}}{{rowLabels[bestMove[1].y]}} ({{bestMove.score}})  
-            <input type="button" value="Make Move" ng-disabled="!bestMove" ng-click="makeMove(playBoard, bestMove); clearBestMove();">
-          </div> 
-          <div class="center" ng-repeat="move in moveList | orderBy : 'score':true">
-            {{columnLabels[move[0].x]}}{{rowLabels[move[0].y]}}{{columnLabels[move[1].x]}}{{rowLabels[move[1].y]}} ({{move.score}}) |
-            <span ng-repeat="bestMoves in move.moves">
-              {{columnLabels[bestMoves[0].x]}}{{rowLabels[bestMoves[0].y]}}{{columnLabels[bestMoves[1].x]}}{{rowLabels[bestMoves[1].y]}} 
-            </span>
+            <input type="button" value="Make Move" ng-disabled="!bestMove" ng-click="makeMove(bestMove); clearBestMove();">
           </div>
         </div>
         <!-- BOTTOM HUMAN -->
@@ -303,7 +291,7 @@
             <span ng-if="validMove === true">VALID MOVE</span>
             <span ng-if="validMove === false">INVALID MOVE</span>
           </div>
-          <input type="button" value="Make Move" ng-disabled="!validMove" ng-click="makeMove(playBoard, humanMove); clearValidMoves()">
+          <input type="button" value="Make Move" ng-disabled="!validMove" ng-click="makeMove(humanMove); clearValidMoves()">
         </div>
       </div>
       <hr />

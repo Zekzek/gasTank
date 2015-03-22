@@ -5,22 +5,24 @@
 	var BOTTOM = 1;
 	var PLAYERS = [TOP,BOTTOM];
 	
-  	var negamax = function(board, depth, playerId) {
-		if (depth == 0) {//TODO: or leaf
-			var result = {'moves':[], 'value':(playerId * getHeuristic(board))};
-			return result;
+  	var negamax = function(board, depth, alpha, beta, playerId) {
+		if (depth == 0 || checkForLoss(board, playerId)) {//TODO: or leaf
+			return playerId * getHeuristic(board);
 		}
-		var bestResult = {'value':Number.NEGATIVE_INFINITY};
+		var bestResult = Number.NEGATIVE_INFINITY;
 		var childBoards = getChildBoards(board, playerId);
 		for (var i in childBoards) {
-			var result = negamax(childBoards[i], depth - 1, -playerId);
-			result.value = -result.value;
-			if (result.value > bestResult.value) {
+			var result = -negamax(childBoards[i], depth - 1, -beta, -alpha -playerId);
+			if (result > bestResult) {
 				var bestResult = result;
-				var bestMove = childBoards[i].move;
+			}
+			if (result > alpha) {
+				alpha = result;
+			}
+			if (alpha >= beta) {
+				break;
 			}
 		}
-		bestResult.moves.push(bestMove);
 		return bestResult;
 	}
 	
@@ -46,6 +48,20 @@
 			}
 		}
 		return score;
+	}
+	
+	var checkForLoss = function(board, turn) {
+		var hasKing = false;
+		var hasMoves = false;
+		for (var i in board.pieces[turn]) {
+			if (board.pieces[turn][i].symbol == 'K') {
+				hasKing = true;
+			}
+			if (!hasMoves && getValidMovesFor(board, board.pieces[turn][i]).length > 0) {
+				hasMoves = true;
+			}
+		}
+		return !hasKing || !hasMoves;
 	}
 	
 	var getChildBoards = function(board, playerId) {
@@ -175,9 +191,8 @@
 	}
 	
 onmessage = function(e) {
-	var result = negamax(e.data[0], e.data[1], e.data[2]);
-	result.value = -result.value;
-	result.index = e.data[3];
+	var value = -negamax(e.data[0], e.data[1], Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, e.data[2]);
+	var result = {'value':value, 'index':e.data[3]};
 	postMessage(result);
 	close();
 };
