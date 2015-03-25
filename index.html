@@ -9,8 +9,10 @@
     <script type="text/javascript" src="negamaxWorker.js"></script>
   </head>
   <body ng-controller="gasTankCtrl">
+    <a class="zekzek-link" href="../index.html">
+    </a>
     <div class="inline top" style="width:25%">
-      <div class="center"><h2>{{player[TOP].name}}</h2></div>
+      <div class="center"><h1 class="shadow" ng-attr-style="color:{{player[TOP].color}}">{{player[TOP].name}}</h1></div>
       <!-- TOP SETUP -->
       <div ng-if="phase == 'setup'">
         <div class="center">Who are you?: <input type="text" ng-model="player[TOP].name"></div>
@@ -30,20 +32,17 @@
         <!-- TOP COMPUTER -->
         <div ng-if="player[TOP].ai=='Computer'">
           <div class="center">
-            <input type="button" value="Start Thinking" ng-disabled="thinking" ng-click="getBestMove(1, turn, player[TOP].time)">
-            <input type="button" value="Stop Thinking" ng-disabled="!thinking" ng-click="killWorkers()">
-          </div>
-          <div class="center">
             Move ({{depth}}): 
             {{columnLabels[bestMove[0].x]}}{{rowLabels[bestMove[0].y]}}{{columnLabels[bestMove[1].x]}}{{rowLabels[bestMove[1].y]}} ({{bestMove.score}})  
-            <input type="button" value="Make Move" ng-disabled="!bestMove" ng-click="makeMove(bestMove); clearBestMove();">
+            <button type="button" ng-disabled="!bestMove" ng-click="makeMove(bestMove); clearBestMove();">
+              Make Move <div ng-if="thinking" class="inline busy">&#8635;</div>
+            </button>
           </div> 
         </div>
         <!-- TOP HUMAN -->
         <div ng-if="player[TOP].ai=='Human'" class="center">
           <div class="center">
-            <span>{{columnLabels[humanMove[0].x]}}{{rowLabels[humanMove[0].y]}}</span>
-            <span>{{columnLabels[humanMove[1].x]}}{{rowLabels[humanMove[1].y]}}</span>
+            <input class="center" type="text" ng-model="displayMove.human" ng-change="calcMove()">
           </div>
           <div class="center">
             <span ng-if="validMove === true">VALID MOVE</span>
@@ -267,35 +266,8 @@
         </text>
       </svg>
     </div>
-    <div class="inline middle" style="width:25%">
-      <div ng-if="phase == 'game' && turn == BOTTOM">
-        <!-- BOTTOM COMPUTER -->
-        <div ng-if="player[BOTTOM].ai=='Computer'">
-          <div class="center">
-            <input type="button" value="Start Thinking" ng-disabled="thinking" ng-click="getBestMove(1, turn, player[BOTTOM].time)">
-            <input type="button" value="Stop Thinking" ng-disabled="!thinking" ng-click="killWorkers()">
-          </div>
-          <div class="center">
-            Move ({{depth}}): 
-            {{columnLabels[bestMove[0].x]}}{{rowLabels[bestMove[0].y]}}{{columnLabels[bestMove[1].x]}}{{rowLabels[bestMove[1].y]}} ({{bestMove.score}})  
-            <input type="button" value="Make Move" ng-disabled="!bestMove" ng-click="makeMove(bestMove); clearBestMove();">
-          </div>
-        </div>
-        <!-- BOTTOM HUMAN -->
-        <div ng-if="player[BOTTOM].ai=='Human'" class="center">
-          <div class="center">
-            <span>{{columnLabels[humanMove[0].x]}}{{rowLabels[humanMove[0].y]}}</span>
-            <span>{{columnLabels[humanMove[1].x]}}{{rowLabels[humanMove[1].y]}}</span>
-          </div>
-          <div class="center">
-            <span ng-if="validMove === true">VALID MOVE</span>
-            <span ng-if="validMove === false">INVALID MOVE</span>
-          </div>
-          <input type="button" value="Make Move" ng-disabled="!validMove" ng-click="makeMove(humanMove); clearValidMoves()">
-        </div>
-      </div>
-      <hr />
-      <div class="center"><h2>{{player[BOTTOM].name}}</h2></div>
+    <div class="inline top" style="width:25%">
+      <div class="center"><h1 class="shadow" ng-attr-style="color:{{player[BOTTOM].color}}">{{player[BOTTOM].name}}</h1></div>
       <!-- BOTTOM SETUP -->
       <div ng-if="phase == 'setup'">
         <div class="center">Who are you?: <input type="text" ng-model="player[BOTTOM].name"></div>
@@ -308,6 +280,30 @@
             ng-model="player[BOTTOM].order"
             ng-change="toggleOrder(player[TOP])">
           </select>
+        </div>
+      </div>
+      <hr />
+      <div ng-if="phase == 'game' && turn == BOTTOM">
+        <!-- BOTTOM COMPUTER -->
+        <div ng-if="player[BOTTOM].ai=='Computer'">
+          <div class="center">
+            Move ({{depth}}): 
+            {{columnLabels[bestMove[0].x]}}{{rowLabels[bestMove[0].y]}}{{columnLabels[bestMove[1].x]}}{{rowLabels[bestMove[1].y]}} ({{bestMove.score}})
+            <button type="button" ng-disabled="!bestMove" ng-click="makeMove(bestMove); clearBestMove();">
+              Make Move <div ng-if="thinking" class="inline busy">&#8635;</div>
+            </button>
+          </div>
+        </div>
+        <!-- BOTTOM HUMAN -->
+        <div ng-if="player[BOTTOM].ai=='Human'" class="center">
+          <div class="center">
+            <input class="center" type="text" ng-model="displayMove.human" ng-change="calcMove()">
+          </div>
+          <div class="center">
+            <span ng-if="validMove === true">VALID MOVE</span>
+            <span ng-if="validMove === false">INVALID MOVE</span>
+          </div>
+          <input type="button" value="Make Move" ng-disabled="!validMove" ng-click="makeMove(humanMove); clearValidMoves()">
         </div>
       </div>
     </div>

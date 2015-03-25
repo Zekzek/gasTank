@@ -5,16 +5,63 @@
 	var BOTTOM = 1;
 	var PLAYERS = [TOP,BOTTOM];
 	
-  	var negamax = function(board, depth, alpha, beta, playerId) {
-		if (depth == 0 || checkForLoss(board, playerId)) {//TODO: or leaf
-			return playerId * getHeuristic(board);
+  	var negamax = function(board, depth, alpha, beta, playerId, historicalMoves) {
+		if (depth == 0 || checkForLoss(board, playerId)) {
+			return playerId * getHeuristic(board) * (depth + 1);
 		}
 		var bestResult = Number.NEGATIVE_INFINITY;
-		var childBoards = getChildBoards(board, playerId);
-		for (var i in childBoards) {
-			var result = -negamax(childBoards[i], depth - 1, -beta, -alpha -playerId);
+		
+		/* test variation: wait to make the move until after alpha-beta pruning //
+		var moves = getAllMoves(board, playerId);
+		for(var i in moves) {
+			if (historicalMoves[depth - 1] && historicalMoves[depth - 1][0] && historicalMoves[depth - 1][1] 
+					&& moves[i][0].x == historicalMoves[depth - 1][0].x 
+					&& moves[i][0].y == historicalMoves[depth - 1][0].y
+					&& moves[i][1].x == historicalMoves[depth - 1][1].x 
+					&& moves[i][1].y == historicalMoves[depth - 1][1].y) {
+				console.debug("promoting: " 
+						+ historicalMoves[depth - 1][0].x 
+						+ historicalMoves[depth - 1][0].y
+						+ historicalMoves[depth - 1][1].x
+						+ historicalMoves[depth - 1][1].y);
+				moves.unshift(moves.splice(i, 1)[0]);
+				break;
+			}
+		}
+		for (var i in moves) {
+			var boardCopy = JSON.parse(JSON.stringify(board));
+			makeMove(boardCopy, boardCopy.pieces[playerId][moves[i][0].index], moves[i]);
+			boardCopy.move = [boardCopy.pieces[playerId][moves[i][0].index], moves[i]];
+			
+			var result = -negamax(boardCopy, depth - 1, -beta, -alpha, -playerId, historicalMoves);
 			if (result > bestResult) {
 				var bestResult = result;
+				historicalMoves[depth-1] = boardCopy.move;
+			}
+			if (result > alpha) {
+				alpha = result;
+			}
+			if (alpha >= beta) {
+				break;
+			}
+		}
+		/*/
+		var childBoards = getChildBoards(board, playerId);
+		for(var i in childBoards) {
+			if (historicalMoves[depth - 1] && historicalMoves[depth - 1][0] && historicalMoves[depth - 1][1] 
+					&& childBoards[i].move[0].x == historicalMoves[depth - 1][0].x 
+					&& childBoards[i].move[0].y == historicalMoves[depth - 1][0].y
+					&& childBoards[i].move[1].x == historicalMoves[depth - 1][1].x 
+					&& childBoards[i].move[1].y == historicalMoves[depth - 1][1].y) {
+				childBoards.unshift(childBoards.splice(i, 1)[0]);
+				break;
+			}
+		}
+		for (var i in childBoards) {
+			var result = -negamax(childBoards[i], depth - 1, -beta, -alpha, -playerId, historicalMoves);
+			if (result > bestResult) {
+				bestResult = result;
+				historicalMoves[depth-1] = childBoards[i].move;
 			}
 			if (result > alpha) {
 				alpha = result;
@@ -31,19 +78,38 @@
 		for (var i in PLAYERS) {
 			for (var j in board.pieces[PLAYERS[i]]) {
 				if (board.pieces[PLAYERS[i]][j].gas == 0) {
-					var multiplier = PLAYERS[i] * 0.2;
+					var multiplier = PLAYERS[i] * 0.1;
 				}
 				else {
-					var multiplier = PLAYERS[i] * (0.7 + board.pieces[PLAYERS[i]][j].gas / 10);
+					var multiplier = PLAYERS[i] * (0.85 + board.pieces[PLAYERS[i]][j].gas / 20);
 				}
 				if (board.pieces[PLAYERS[i]][j].symbol == 'K') {
-					score += 100000 * multiplier;
+					score += 1000 * multiplier;
 				}
 				else if (board.pieces[PLAYERS[i]][j].symbol == 'Q') {
 					score += 50 * multiplier;
 				}
 				else {
 					score += 30 * multiplier;
+				}
+				score += multiplier * getThreateningHeuristic(board, board.pieces[PLAYERS[i]][j], -i); 
+			}
+		}
+		return score;
+	}
+	
+	var getThreateningHeuristic = function(board, piece, enemy) {
+		var score = 0;
+		var moves = getValidMovesFor(board, piece);
+		for (var i in moves) {
+			for (var j in board.pieces[PLAYERS[enemy]]) {
+				if (board.pieces[PLAYERS[enemy]][j].x == moves[i].x && board.pieces[PLAYERS[enemy]][j].y == moves[i].y) {
+					if (board.pieces[PLAYERS[enemy]].symbol == 'K') {
+						score += 500;
+					}
+					else {
+						score += 10;
+					}
 				}
 			}
 		}
@@ -62,6 +128,19 @@
 			}
 		}
 		return !hasKing || !hasMoves;
+	}
+	
+	var getAllMoves = function(board, playerId) {
+		var moves = [];
+		for(var i in board.pieces[playerId]) {
+			var piece = board.pieces[playerId];
+			piece.index = i;
+			var pieceMoves = getValidMovesFor(board, board.pieces[playerId][i]);
+			for (var j in pieceMoves) {
+				moves.push([piece, pieceMoves[j]]);
+			}
+		}
+		return moves;
 	}
 	
 	var getChildBoards = function(board, playerId) {
@@ -186,13 +265,13 @@
 			addIfOnBoard(validMoves, {x:(piece.x + 1), y:(piece.y - 1)});
 		}
 		//TODO: taking your own king is illegal, remove that move from list?
-			
+		
 		return validMoves;
 	}
 	
 onmessage = function(e) {
-	var value = -negamax(e.data[0], e.data[1], Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, e.data[2]);
-	var result = {'value':value, 'index':e.data[3]};
+	var value = -negamax(e.data[0], e.data[1], Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, e.data[2], e.data[3]);
+	var result = {'value':value, 'index':e.data[4]};
 	postMessage(result);
-	close();
+	//close();
 };

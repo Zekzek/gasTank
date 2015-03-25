@@ -1,3 +1,11 @@
+.zekzek-link {
+	position: absolute;
+	width: 100px;
+	height: 100px;
+	background-color: #0FF;
+	background-image: url('../image/zekzek.png');
+}
+
 hr {
 	background:#000; 
 	border:0; 
@@ -15,6 +23,7 @@ hr {
 
 .top {
 	vertical-align: top;
+	margin-top: 100px;
 }
 
 .bottom {
@@ -22,7 +31,8 @@ hr {
 }
 
 .middle{
-	vertical-align: middle;
+	top: 50%;
+	transform: translate(0%, -100%) }
 }
 
 .noselect {
@@ -32,4 +42,40 @@ hr {
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
+}
+
+@-moz-keyframes spin {
+    from { -moz-transform: rotate(0deg); }
+    to { -moz-transform: rotate(360deg); }
+}
+@-webkit-keyframes spin {
+    from { -webkit-transform: rotate(0deg); }
+    to { -webkit-transform: rotate(360deg); }
+}
+@keyframes spin {
+    from {transform:rotate(0deg);}
+    to {transform:rotate(360deg);}
+}
+
+.shadow {
+	text-shadow: 0px 1px 0px #000,
+		0px -1px 0px #000,
+		-1px 0px 0px #000,
+		1px 0px 0px #000;
+}
+
+.busy {
+	-webkit-animation-name: spin;
+    -webkit-animation-duration: 1000ms;
+    -webkit-animation-iteration-count: infinite;
+    -webkit-animation-timing-function: linear;
+    -moz-animation-name: spin;
+    -moz-animation-duration: 1000ms;
+    -moz-animation-iteration-count: infinite;
+    -moz-animation-timing-function: linear;
+    -ms-animation-name: spin;
+    -ms-animation-duration: 1000ms;
+    -ms-animation-iteration-count: infinite;
+    -ms-animation-timing-function: linear;
+    -o-transition: rotate(3600deg);
 }

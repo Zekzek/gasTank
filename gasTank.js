@@ -22,7 +22,7 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 	
 	$scope.player = {};
 	$scope.player[TOP] = {'name':'Top', 'ai':'Computer', 'color':'#A00000', 'time':5, 'order':'1st' };
-	$scope.player[BOTTOM] = {'name':'Bottom', 'ai':'Human', 'color':'#0000A0', 'time':5, 'order':'2nd' };
+	$scope.player[BOTTOM] = {'name':'Bottom', 'ai':'Computer', 'color':'#0000A0', 'time':5, 'order':'2nd' };
 	$scope.turn;
 	$scope.workers = [];
 	$scope.thinking = false;
@@ -40,13 +40,42 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 		else {
 			$scope.turn = BOTTOM;
 		}
+		if ($scope.player[$scope.turn].ai == 'Computer') {
+			$scope.getBestMove(1, $scope.turn, [], $scope.player[TOP].time);
+		}
 	}
 	
-	/*
-		DISPLAY METHODS
-	*/
 	$scope.displayValidMovesFor = function(piece) {
 		$scope.validMoves = getValidMovesFor($scope.playBoard, piece);
+	}
+	
+	$scope.displayMove = function(move) {
+		$scope.validMoves = move;
+	}
+	
+	$scope.calcMove = function() {
+		//console.debug($scope.displayMove.human);
+		moveAsIndexList = [
+			$scope.convertLabelToIndex($scope.displayMove.human.charAt(0), $scope.columnLabels),
+			$scope.convertLabelToIndex($scope.displayMove.human.charAt(1), $scope.rowLabels),
+			$scope.convertLabelToIndex($scope.displayMove.human.charAt(2), $scope.columnLabels),
+			$scope.convertLabelToIndex($scope.displayMove.human.charAt(3), $scope.rowLabels)
+		];
+		
+		if (moveAsIndexList[0] && moveAsIndexList[1]) {
+			$scope.setStartPos({'x':+moveAsIndexList[0], 'y':+moveAsIndexList[1]});
+			if (moveAsIndexList[2] && moveAsIndexList[3]) {
+				$scope.setEndPos({'x':+moveAsIndexList[2], 'y':+moveAsIndexList[3]});
+			}
+		}
+	}
+	
+	$scope.convertLabelToIndex = function(label, labels) {
+		for (var i in labels) {
+			if (labels[i].toLowerCase() == label.toLowerCase()) {
+				return i;
+			}
+		}
 	}
 	
 	$scope.setStartPos = function(item) {
@@ -65,6 +94,13 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 			if (piece) {
 				if ($scope.humanMove[0].x != item.x || $scope.humanMove[0].y != item.y) {
 					$scope.humanMove[1] = {'x':item.x, 'y':item.y};
+					$scope.displayMove.human = 
+						$scope.columnLabels[$scope.humanMove[0].x]
+						+ $scope.rowLabels[$scope.humanMove[0].y]
+						+ $scope.columnLabels[$scope.humanMove[1].x]
+						+ $scope.rowLabels[$scope.humanMove[1].y]
+					console.debug(JSON.stringify($scope.humanMove));
+					$scope.displayMove($scope.humanMove);
 					// if moving an enemy piece, invalidate move
 					for (var i in $scope.playBoard.pieces[-$scope.turn]) {
 						if ($scope.playBoard.pieces[-$scope.turn][i] == piece) {
@@ -72,7 +108,7 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 							return;
 						}
 					}
-					$scope.validMove = isValidMove($scope.playBoard, piece, $scope.humanMove[1]); 
+					$scope.validMove = isValidMove($scope.playBoard, piece, $scope.humanMove[1]);					
 				}
 				else {
 					$scope.humanMove[0] = null;
@@ -99,8 +135,7 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 		return { 'column':$scope.columnLabels[item.x], 'row':$scope.rowLabels[item.y] };
 	}
 	
-	$scope.getBestMove = function(depth, isPlayer, time) {
-		console.debug('getBestMove(' + depth + "," + isPlayer + "," + time + ")");
+	$scope.getBestMove = function(depth, isPlayer, historicalMoves, time) {
 		$scope.thinking = true;
 		if (time) {
 			setTimeout(function() {
@@ -109,10 +144,12 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 			}, time * 1000);
 		}
 		var childBoards = getChildBoards($scope.playBoard, isPlayer);
-		$scope.moveCount = childBoards.length;
-		$scope.movesRecieved = 0;
+		if (!$scope.bestMove) {
+			$scope.bestMove = childBoards[0].move;
+		}
 		$scope.bestValue = Number.NEGATIVE_INFINITY;
 		$scope.depth = depth;
+		historicalMoves.unshift({});
 		var bestMove = null;
 		$scope.workers = [];
 		for (var i in childBoards) {		
@@ -120,30 +157,29 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 			if (!$scope.moveList[i]) {
 				$scope.moveList[i] = childBoards[i].move;
 			}
-			var negamaxWorker = new Worker('negamaxWorker.js');
-			negamaxWorker.postMessage([childBoards[i], depth - 1, -isPlayer, i]);
-			negamaxWorker.onmessage = function(msg) {
-				console.debug("getBestMove received: " + JSON.stringify(msg.data));
-				$scope.movesRecieved++;
-				//$scope.moveList[msg.data.index].score = msg.data.value;
-				//$scope.moveList[msg.data.index].moves = msg.data.moves;
+			$scope.workers[i] = new Worker('negamaxWorker.js');
+			$scope.workers[i].postMessage([childBoards[i], depth - 1, -isPlayer, historicalMoves, i]);
+			$scope.workers[i].onmessage = function(msg) {
+				this.terminate();
+				var workerIndex = $scope.workers.indexOf(this);
+				$scope.workers.splice(workerIndex, 1);
 				if (msg.data.value > $scope.bestValue) {
 					$scope.bestValue = msg.data.value;
 					bestMove = childBoards[msg.data.index].move;
 					bestMove.score = msg.data.value;
 				}
-				if ($scope.movesRecieved == $scope.moveCount) {
+				if ($scope.workers.length == 0) {
 					$scope.bestMove = bestMove;
+					$scope.displayMove($scope.bestMove);
 					$scope.$apply();
 					if (depth < 30) {
-						$scope.getBestMove(depth + 1, isPlayer);
+						$scope.getBestMove(depth + 1, isPlayer, historicalMoves);
 					}
 					else {
 						$scope.thinking = false;
 					}
 				}
 			}
-			$scope.workers.push(negamaxWorker);
 		}
 	}
 	
@@ -160,11 +196,15 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 			move[0] = getAtPos($scope.playBoard, move[0]);
 		}
 		makeMove($scope.playBoard, move[0], move[1]);
+		$scope.displayMove.human = "";
 		$scope.turn *= -1;
 		$scope.checkForLoss();
 		$scope.humanMove[0] = null;
 		$scope.humanMove[1] = null;
 		$scope.clearBestMove();
+		if ($scope.player[$scope.turn].ai == 'Computer') {
+			$scope.getBestMove(1, $scope.turn, [], $scope.player[TOP].time);
+		}
 	}
 	
 	$scope.checkForLoss = function() {
