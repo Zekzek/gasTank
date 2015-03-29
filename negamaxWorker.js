@@ -4,39 +4,43 @@
 	var TOP = -1;
 	var BOTTOM = 1;
 	var PLAYERS = [TOP,BOTTOM];
+	var heuristicCount = 0;
+	var endTime = 0;
 	
-  	var negamax = function(board, depth, alpha, beta, playerId, historicalMoves) {
+  	var negamax = function(board, depth, alpha, beta, playerId, historicalMoves, name) {
 		if (depth == 0 || checkForLoss(board, playerId)) {
-			return playerId * getHeuristic(board) * (depth + 1);
+			return playerId * getHeuristic(board, name) * (depth + 1);
 		}
 		var bestResult = Number.NEGATIVE_INFINITY;
 		
-		/* test variation: wait to make the move until after alpha-beta pruning //
 		var moves = getAllMoves(board, playerId);
+		// sort historically best move to the front
 		for(var i in moves) {
 			if (historicalMoves[depth - 1] && historicalMoves[depth - 1][0] && historicalMoves[depth - 1][1] 
 					&& moves[i][0].x == historicalMoves[depth - 1][0].x 
 					&& moves[i][0].y == historicalMoves[depth - 1][0].y
 					&& moves[i][1].x == historicalMoves[depth - 1][1].x 
 					&& moves[i][1].y == historicalMoves[depth - 1][1].y) {
-				console.debug("promoting: " 
-						+ historicalMoves[depth - 1][0].x 
-						+ historicalMoves[depth - 1][0].y
-						+ historicalMoves[depth - 1][1].x
-						+ historicalMoves[depth - 1][1].y);
 				moves.unshift(moves.splice(i, 1)[0]);
 				break;
 			}
 		}
+		
+		var bestMove = historicalMoves[depth-1];
 		for (var i in moves) {
 			var boardCopy = JSON.parse(JSON.stringify(board));
-			makeMove(boardCopy, boardCopy.pieces[playerId][moves[i][0].index], moves[i]);
-			boardCopy.move = [boardCopy.pieces[playerId][moves[i][0].index], moves[i]];
+			makeMove(boardCopy, boardCopy.pieces[playerId][+moves[i][0].index], moves[i][1]);
+			boardCopy.move = moves[i];
 			
-			var result = -negamax(boardCopy, depth - 1, -beta, -alpha, -playerId, historicalMoves);
+			if (Date.now() < endTime) {			
+				var result = -negamax(boardCopy, depth - 1, -beta, -alpha, -playerId, historicalMoves, name);
+			} 
+			else {
+				return bestResult;
+			}
 			if (result > bestResult) {
 				var bestResult = result;
-				historicalMoves[depth-1] = boardCopy.move;
+				bestMove = boardCopy.move;
 			}
 			if (result > alpha) {
 				alpha = result;
@@ -45,38 +49,17 @@
 				break;
 			}
 		}
-		/*/
-		var childBoards = getChildBoards(board, playerId);
-		for(var i in childBoards) {
-			if (historicalMoves[depth - 1] && historicalMoves[depth - 1][0] && historicalMoves[depth - 1][1] 
-					&& childBoards[i].move[0].x == historicalMoves[depth - 1][0].x 
-					&& childBoards[i].move[0].y == historicalMoves[depth - 1][0].y
-					&& childBoards[i].move[1].x == historicalMoves[depth - 1][1].x 
-					&& childBoards[i].move[1].y == historicalMoves[depth - 1][1].y) {
-				childBoards.unshift(childBoards.splice(i, 1)[0]);
-				break;
-			}
-		}
-		for (var i in childBoards) {
-			var result = -negamax(childBoards[i], depth - 1, -beta, -alpha, -playerId, historicalMoves);
-			if (result > bestResult) {
-				bestResult = result;
-				historicalMoves[depth-1] = childBoards[i].move;
-			}
-			if (result > alpha) {
-				alpha = result;
-			}
-			if (alpha >= beta) {
-				break;
-			}
-		}
+		historicalMoves[depth-1] = bestMove;
 		return bestResult;
 	}
 	
-	var getHeuristic = function(board) {
+	var getHeuristic = function(board, name) {
 		var score = 0; 	
+		// for each team
 		for (var i in PLAYERS) {
+			// for each player on that team
 			for (var j in board.pieces[PLAYERS[i]]) {
+				var multiplier = PLAYERS[i];
 				if (board.pieces[PLAYERS[i]][j].gas == 0) {
 					var multiplier = PLAYERS[i] * 0.1;
 				}
@@ -87,14 +70,17 @@
 					score += 1000 * multiplier;
 				}
 				else if (board.pieces[PLAYERS[i]][j].symbol == 'Q') {
-					score += 50 * multiplier;
+					score += 100 * multiplier;
 				}
 				else {
-					score += 30 * multiplier;
+					score += 70 * multiplier;
 				}
-				score += multiplier * getThreateningHeuristic(board, board.pieces[PLAYERS[i]][j], -i); 
+				if (name == "Threat") {
+					score += multiplier * getThreateningHeuristic(board, board.pieces[PLAYERS[i]][j], -PLAYERS[i]);
+				}
 			}
 		}
+		heuristicCount++;
 		return score;
 	}
 	
@@ -102,13 +88,15 @@
 		var score = 0;
 		var moves = getValidMovesFor(board, piece);
 		for (var i in moves) {
-			for (var j in board.pieces[PLAYERS[enemy]]) {
-				if (board.pieces[PLAYERS[enemy]][j].x == moves[i].x && board.pieces[PLAYERS[enemy]][j].y == moves[i].y) {
-					if (board.pieces[PLAYERS[enemy]].symbol == 'K') {
-						score += 500;
+			//for each enemy piece
+			for (var j in board.pieces[PLAYERS[+enemy]]) {
+				// if the enemy sits in one of the threatened squares
+				if (board.pieces[PLAYERS[+enemy]][j].x == moves[i].x && board.pieces[PLAYERS[+enemy]][j].y == moves[i].y) {
+					if (board.pieces[PLAYERS[+enemy]][j].symbol == 'K') {
+						score += 50;
 					}
 					else {
-						score += 10;
+						score += 5;
 					}
 				}
 			}
@@ -132,8 +120,8 @@
 	
 	var getAllMoves = function(board, playerId) {
 		var moves = [];
-		for(var i in board.pieces[playerId]) {
-			var piece = board.pieces[playerId];
+		for(var i = 0; i < board.pieces[playerId].length; i++) {
+			var piece = board.pieces[playerId][i];
 			piece.index = i;
 			var pieceMoves = getValidMovesFor(board, board.pieces[playerId][i]);
 			for (var j in pieceMoves) {
@@ -265,13 +253,47 @@
 			addIfOnBoard(validMoves, {x:(piece.x + 1), y:(piece.y - 1)});
 		}
 		//TODO: taking your own king is illegal, remove that move from list?
-		
 		return validMoves;
 	}
 	
 onmessage = function(e) {
-	var value = -negamax(e.data[0], e.data[1], Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, e.data[2], e.data[3]);
-	var result = {'value':value, 'index':e.data[4]};
-	postMessage(result);
-	//close();
+	var board = e.data[0];
+	var turn = e.data[1];
+	var historicalMoves = e.data[2];
+	var name = e.data[3];
+	var time = e.data[4];
+	
+	endTime = Date.now() + 1000 * time;
+
+	for (var depth = 1; depth < 50 && Date.now() < endTime; depth++) {
+		historicalMoves.unshift({});
+		var score = negamax(board, depth, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, turn, historicalMoves, name);
+		
+		var foundBestMove = false;
+		var bestMoveIndex = historicalMoves.length-1;
+		// make sure its a friendly piece
+		if (historicalMoves[ bestMoveIndex ] && historicalMoves[ bestMoveIndex ][0]) {
+			for (var i in board.pieces[turn]) {
+				if (board.pieces[turn][i].x == historicalMoves[ bestMoveIndex ][0].x && board.pieces[turn][i].y == historicalMoves[ bestMoveIndex ][0].y) {
+					postMessage({"bestMove":historicalMoves[ historicalMoves.length-1 ], "depth":depth, "score":score});
+					console.debug("heuristicCount: " + heuristicCount);	
+					var foundBestMove = true;
+				}
+			}
+		}
+		//2nd chance, make sure its a friendly piece
+		bestMoveIndex -= 1;
+		if (!foundBestMove && historicalMoves[ bestMoveIndex ] && historicalMoves[ bestMoveIndex ][0]) {
+			for (var i in board.pieces[turn]) {
+				if (board.pieces[turn][i].x == historicalMoves[ bestMoveIndex ][0].x && board.pieces[turn][i].y == historicalMoves[ bestMoveIndex ][0].y) {
+					postMessage({"bestMove":historicalMoves[ historicalMoves.length-1 ], "depth":depth, "score":score});
+					console.debug("heuristicCount: " + heuristicCount);	
+				}
+			}
+		}
+		console.debug((endTime - Date.now()) + " remaining");
+	}
+	console.debug("done - " + (Date.now() - endTime) + " over");
+	postMessage({"bestMove":historicalMoves[ historicalMoves.length-1 ], "depth":(depth-1), "score":score, "done":true});
+	close();
 };

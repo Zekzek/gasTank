@@ -15,7 +15,14 @@
       <div class="center"><h1 class="shadow" ng-attr-style="color:{{player[TOP].color}}">{{player[TOP].name}}</h1></div>
       <!-- TOP SETUP -->
       <div ng-if="phase == 'setup'">
-        <div class="center">Who are you?: <input type="text" ng-model="player[TOP].name"></div>
+        <div ng-if="player[TOP].ai == 'Human'" class="center">Who are you?: <input type="text" ng-model="player[TOP].name"></div>
+        <div ng-if="player[TOP].ai == 'Computer'" class="center">
+          Who are you?:
+          <select 
+            ng-options="persona for persona in personas" 
+            ng-model="player[TOP].name">
+          </select>
+        </div>
         <div class="center">What are you?: <select ng-options="ai for ai in aiSettings" ng-model="player[TOP].ai"></select></div>
         <div class="center">What color are you?: <input type="color" ng-model="player[TOP].color"/></div>
         <div class="center" ng-if="player[TOP].ai=='Computer'">How long are you going to think?: <input type="text" size="3" ng-model="player[TOP].time"> seconds</div>
@@ -270,7 +277,14 @@
       <div class="center"><h1 class="shadow" ng-attr-style="color:{{player[BOTTOM].color}}">{{player[BOTTOM].name}}</h1></div>
       <!-- BOTTOM SETUP -->
       <div ng-if="phase == 'setup'">
-        <div class="center">Who are you?: <input type="text" ng-model="player[BOTTOM].name"></div>
+        <div ng-if="player[BOTTOM].ai == 'Human'" class="center">Who are you?: <input type="text" ng-model="player[BOTTOM].name"></div>
+        <div ng-if="player[BOTTOM].ai == 'Computer'" class="center">
+          Who are you?:
+          <select 
+            ng-options="persona for persona in personas" 
+            ng-model="player[BOTTOM].name">
+          </select>
+        </div>
         <div class="center">What are you?: <select ng-options="ai for ai in aiSettings" ng-model="player[BOTTOM].ai"></select></div>
         <div class="center">What color are you?: <input type="color" ng-model="player[BOTTOM].color"/></div>
         <div class="center" ng-if="player[BOTTOM].ai=='Computer'">How long are you going to think?: <input type="text" size="3" ng-model="player[BOTTOM].time"> seconds</div>

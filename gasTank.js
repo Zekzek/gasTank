@@ -10,6 +10,7 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 	$scope.columnLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 	$scope.rowLabels = ['7', '6', '5', '4', '3', '2', '1'];
 	$scope.aiSettings = ['Human', 'Computer'];
+	$scope.personas = ['Dive', 'Threat'];
 	$scope.orderOptions = ['1st', '2nd'];
 	$scope.gasColor = ['#000', '#C20', '#9C0', '#0C0'];
 	
@@ -21,8 +22,8 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 	$scope.moveList = [];
 	
 	$scope.player = {};
-	$scope.player[TOP] = {'name':'Top', 'ai':'Computer', 'color':'#A00000', 'time':5, 'order':'1st' };
-	$scope.player[BOTTOM] = {'name':'Bottom', 'ai':'Computer', 'color':'#0000A0', 'time':5, 'order':'2nd' };
+	$scope.player[TOP] = {'name':'Threat', 'ai':'Computer', 'color':'#A00000', 'time':5, 'order':'1st' };
+	$scope.player[BOTTOM] = {'name':'Dive', 'ai':'Computer', 'color':'#0000A0', 'time':5, 'order':'2nd' };
 	$scope.turn;
 	$scope.workers = [];
 	$scope.thinking = false;
@@ -41,7 +42,7 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 			$scope.turn = BOTTOM;
 		}
 		if ($scope.player[$scope.turn].ai == 'Computer') {
-			$scope.getBestMove(1, $scope.turn, [], $scope.player[TOP].time);
+			$scope.getBestMove([], $scope.player[$scope.turn].name, $scope.player[$scope.turn].time);
 		}
 	}
 	
@@ -54,7 +55,6 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 	}
 	
 	$scope.calcMove = function() {
-		//console.debug($scope.displayMove.human);
 		moveAsIndexList = [
 			$scope.convertLabelToIndex($scope.displayMove.human.charAt(0), $scope.columnLabels),
 			$scope.convertLabelToIndex($scope.displayMove.human.charAt(1), $scope.rowLabels),
@@ -99,7 +99,6 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 						+ $scope.rowLabels[$scope.humanMove[0].y]
 						+ $scope.columnLabels[$scope.humanMove[1].x]
 						+ $scope.rowLabels[$scope.humanMove[1].y]
-					console.debug(JSON.stringify($scope.humanMove));
 					$scope.displayMove($scope.humanMove);
 					// if moving an enemy piece, invalidate move
 					for (var i in $scope.playBoard.pieces[-$scope.turn]) {
@@ -135,51 +134,20 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 		return { 'column':$scope.columnLabels[item.x], 'row':$scope.rowLabels[item.y] };
 	}
 	
-	$scope.getBestMove = function(depth, isPlayer, historicalMoves, time) {
+	$scope.getBestMove = function(historicalMoves, name, time) {
 		$scope.thinking = true;
-		if (time) {
-			setTimeout(function() {
-				$scope.killWorkers();
-				$scope.$apply();
-			}, time * 1000);
-		}
-		var childBoards = getChildBoards($scope.playBoard, isPlayer);
-		if (!$scope.bestMove) {
-			$scope.bestMove = childBoards[0].move;
-		}
-		$scope.bestValue = Number.NEGATIVE_INFINITY;
-		$scope.depth = depth;
-		historicalMoves.unshift({});
-		var bestMove = null;
-		$scope.workers = [];
-		for (var i in childBoards) {		
-			var move = childBoards[i].move;
-			if (!$scope.moveList[i]) {
-				$scope.moveList[i] = childBoards[i].move;
+		
+		$scope.worker = new Worker('negamaxWorker.js');
+		$scope.worker.postMessage([$scope.playBoard, $scope.turn, historicalMoves, name, time]);
+		$scope.worker.onmessage = function(msg) {
+			$scope.bestMove = msg.data.bestMove;
+			$scope.depth = msg.data.depth;
+			$scope.bestMove.score = msg.data.score;
+			$scope.displayMove($scope.bestMove);
+			if (msg.data.done) {
+				$scope.thinking = false;
 			}
-			$scope.workers[i] = new Worker('negamaxWorker.js');
-			$scope.workers[i].postMessage([childBoards[i], depth - 1, -isPlayer, historicalMoves, i]);
-			$scope.workers[i].onmessage = function(msg) {
-				this.terminate();
-				var workerIndex = $scope.workers.indexOf(this);
-				$scope.workers.splice(workerIndex, 1);
-				if (msg.data.value > $scope.bestValue) {
-					$scope.bestValue = msg.data.value;
-					bestMove = childBoards[msg.data.index].move;
-					bestMove.score = msg.data.value;
-				}
-				if ($scope.workers.length == 0) {
-					$scope.bestMove = bestMove;
-					$scope.displayMove($scope.bestMove);
-					$scope.$apply();
-					if (depth < 30) {
-						$scope.getBestMove(depth + 1, isPlayer, historicalMoves);
-					}
-					else {
-						$scope.thinking = false;
-					}
-				}
-			}
+			$scope.$apply();
 		}
 	}
 	
@@ -192,9 +160,7 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 	}
 	
 	$scope.makeMove = function(move) {
-		if (!move[0].symbol) {
-			move[0] = getAtPos($scope.playBoard, move[0]);
-		}
+		move[0] = getAtPos($scope.playBoard, move[0]);
 		makeMove($scope.playBoard, move[0], move[1]);
 		$scope.displayMove.human = "";
 		$scope.turn *= -1;
@@ -203,7 +169,7 @@ gasTankApp.controller('gasTankCtrl', function($scope, $http, BottomPieces, TopPi
 		$scope.humanMove[1] = null;
 		$scope.clearBestMove();
 		if ($scope.player[$scope.turn].ai == 'Computer') {
-			$scope.getBestMove(1, $scope.turn, [], $scope.player[TOP].time);
+			$scope.getBestMove([], $scope.player[$scope.turn].name, $scope.player[$scope.turn].time);
 		}
 	}
 	
@@ -230,8 +196,8 @@ gasTankApp.factory('BottomPieces', function() {
 	var pieces = [
 		{
 			'symbol': 'N',
-			'x': 1,
-			'y': 6,
+			'x': 3,
+			'y': 5,
 			'gas': 3
 		},
 		{
@@ -260,8 +226,8 @@ gasTankApp.factory('BottomPieces', function() {
 		},
 		{
 			'symbol': 'N',
-			'x': 6,
-			'y': 6,
+			'x': 5,
+			'y': 5,
 			'gas': 3
 		}
 	];
@@ -272,8 +238,8 @@ gasTankApp.factory('TopPieces', function() {
 	var pieces = [
 		{
 			'symbol': 'N',
-			'x': 1,
-			'y': 0,
+			'x': 3,
+			'y': 1,
 			'gas': 3
 		},
 		{
@@ -302,8 +268,8 @@ gasTankApp.factory('TopPieces', function() {
 		},
 		{
 			'symbol': 'N',
-			'x': 6,
-			'y': 0,
+			'x': 5,
+			'y': 1,
 			'gas': 3
 		}
 	];
